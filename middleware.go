@@ -12,7 +12,6 @@ type MapClaims map[string]interface{}
 
 type GinJWTMiddleware struct {
 	Realm                 string
-	IdentityKey           string
 	DisabledAbort         bool
 	Authenticator         func(c *gin.Context) (interface{}, error)
 	Authorizator          func(data interface{}, c *gin.Context) bool
@@ -20,7 +19,6 @@ type GinJWTMiddleware struct {
 	LoginResponse         func(*gin.Context, int, string, time.Time)
 	LogoutResponse        func(*gin.Context, int)
 	RefreshResponse       func(*gin.Context, int, string, time.Time)
-	IdentityHandler       func(*gin.Context) interface{}
 	HTTPStatusMessageFunc func(e error, c *gin.Context) string
 	JWTBody               JWTBody
 }
@@ -82,9 +80,6 @@ var (
 
 	// ErrInvalidPubKey indicates the the given public key is invalid
 	ErrInvalidPubKey = errors.New("public key invalid")
-
-	// IdentityKey default identity key
-	IdentityKey = "identity"
 )
 
 // New for check error with GinJWTMiddleware
@@ -149,17 +144,6 @@ func (mw *GinJWTMiddleware) MiddlewareInit() error {
 		}
 	}
 
-	if mw.IdentityKey == "" {
-		mw.IdentityKey = IdentityKey
-	}
-
-	if mw.IdentityHandler == nil {
-		mw.IdentityHandler = func(c *gin.Context) interface{} {
-			claims := ExtractClaims(c)
-			return claims[mw.IdentityKey]
-		}
-	}
-
 	if mw.HTTPStatusMessageFunc == nil {
 		mw.HTTPStatusMessageFunc = func(e error, c *gin.Context) string {
 			return e.Error()
@@ -199,10 +183,10 @@ func (mw *GinJWTMiddleware) middlewareImpl(c *gin.Context) {
 	}
 
 	c.Set("JWT_PAYLOAD", claims)
-	identity := mw.IdentityHandler(c)
+	identity := mw.JWTBody.IdentityFunc(c)
 
 	if identity != nil {
-		c.Set(mw.IdentityKey, identity)
+		c.Set(mw.JWTBody.IdentityKey, identity)
 	}
 
 	if !mw.Authorizator(identity, c) {

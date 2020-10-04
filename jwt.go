@@ -10,13 +10,15 @@ import (
 	"time"
 )
 
+// IdentityKey default identity key
+var IdentityKey = "identity"
+
 type JWTBody struct {
+	IdentityKey       string
 	Key               []byte
 	SigningAlgorithm  string
 	Timeout           time.Duration
 	MaxRefresh        time.Duration
-	TimeFunc          func() time.Time
-	PayloadFunc       func(data interface{}) MapClaims
 	PrivKeyFile       string
 	PubKeyFile        string
 	privKey           *rsa.PrivateKey
@@ -31,9 +33,16 @@ type JWTBody struct {
 	SendAuthorization bool
 	CookieName        string
 	CookieSameSite    http.SameSite
+	TimeFunc          func() time.Time
+	PayloadFunc       func(data interface{}) MapClaims
+	IdentityFunc      func(*gin.Context) interface{}
 }
 
 func (jb *JWTBody) JWTBodyInit() error {
+	if jb.IdentityKey == "" {
+		jb.IdentityKey = IdentityKey
+	}
+
 	if jb.TokenLookup == "" {
 		jb.TokenLookup = "header:Authorization"
 	}
@@ -48,6 +57,13 @@ func (jb *JWTBody) JWTBodyInit() error {
 
 	if jb.TimeFunc == nil {
 		jb.TimeFunc = time.Now
+	}
+
+	if jb.IdentityFunc == nil {
+		jb.IdentityFunc = func(c *gin.Context) interface{} {
+			claims := ExtractClaims(c)
+			return claims[jb.IdentityKey]
+		}
 	}
 
 	jb.TokenHeadName = strings.TrimSpace(jb.TokenHeadName)
